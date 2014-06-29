@@ -62,84 +62,82 @@ module SimpleCaptcha #:nodoc
       render :partial => 'simple_captcha/simple_captcha', :locals => { :simple_captcha_options => defaults }
     end
 
-    private
+    def simple_captcha_image(simple_captcha_key, options = {})
+      defaults = {}
+      defaults[:time] = options[:time] || Time.now.to_i
 
-      def simple_captcha_image(simple_captcha_key, options = {})
-        defaults = {}
-        defaults[:time] = options[:time] || Time.now.to_i
+      query = defaults.collect{ |key, value| "#{key}=#{value}" }.join('&')
+      url = "#{ENV['RAILS_RELATIVE_URL_ROOT']}/simple_captcha?code=#{simple_captcha_key}&#{query}"
 
-        query = defaults.collect{ |key, value| "#{key}=#{value}" }.join('&')
-        url = "#{ENV['RAILS_RELATIVE_URL_ROOT']}/simple_captcha?code=#{simple_captcha_key}&#{query}"
+      id = simple_captcha_image_id(options)
+      tag('img', :src => url, :alt => 'captcha', :id => id)
+    end
 
-        id = simple_captcha_image_id(options)
-        tag('img', :src => url, :alt => 'captcha', :id => id)
-      end
+    def simple_captcha_image_url(simple_captcha_key, options = {})
+      defaults = {}
+      defaults[:time] = options[:time] || Time.now.to_i
 
-      def simple_captcha_image_url(simple_captcha_key, options = {})
-        defaults = {}
-        defaults[:time] = options[:time] || Time.now.to_i
+      query = defaults.collect{ |key, value| "#{key}=#{value}" }.join('&')
+      "#{ENV['RAILS_RELATIVE_URL_ROOT']}/simple_captcha?code=#{simple_captcha_key}&#{query}"
+    end
 
-        query = defaults.collect{ |key, value| "#{key}=#{value}" }.join('&')
-        "#{ENV['RAILS_RELATIVE_URL_ROOT']}/simple_captcha?code=#{simple_captcha_key}&#{query}"
-      end
+    def simple_captcha_field(options={})
+      html = {:autocomplete => 'off', :required => 'required'}
+      html.merge!(options[:input_html] || {})
+      html[:placeholder] = options[:placeholder] || I18n.t('simple_captcha.placeholder')
 
-      def simple_captcha_field(options={})
-        html = {:autocomplete => 'off', :required => 'required'}
-        html.merge!(options[:input_html] || {})
-        html[:placeholder] = options[:placeholder] || I18n.t('simple_captcha.placeholder')
-
-        if options[:object]
-          text_field(options[:object], :captcha, html.merge(:value => '')) +
+      if options[:object]
+        text_field(options[:object], :captcha, html.merge(:value => '')) +
           hidden_field(options[:object], :captcha_key, {:value => options[:field_value]})
-        else
-          text_field_tag(:captcha, nil, html) +
+      else
+        text_field_tag(:captcha, nil, html) +
           hidden_field_tag(:captcha_key, options[:field_value])
-        end
+      end
+    end
+
+    def simple_captcha_refresh_button(options={})
+      html = {remote: true}
+      html.merge!(options[:refresh_button_html] || {})
+
+      text = options[:refresh_button_text] || I18n.t('simple_captcha.refresh_button_text', default: 'Refresh')
+
+      link_to(text, "#{ENV['RAILS_RELATIVE_URL_ROOT']}/simple_captcha?id=#{simple_captcha_image_id(options)}", html)
+    end
+
+    def simple_captcha_image_id(options={})
+      "simple_captcha-#{options[:field_value][0..10]}"
+    end
+
+    def set_simple_captcha_data(key, options={})
+      code_type = options[:code_type]
+
+      value = generate_simple_captcha_data(code_type)
+      data = SimpleCaptcha::SimpleCaptchaData.get_data(key)
+      data.value = value
+      data.save
+      key
+    end
+
+    def generate_simple_captcha_data(code)
+      value = ''
+
+      case code
+      when 'numeric' then
+        SimpleCaptcha.length.times{value << (48 + rand(10)).chr}
+      else
+        SimpleCaptcha.length.times{value << (65 + rand(26)).chr}
       end
 
-      def simple_captcha_refresh_button(options={})
-        html = {remote: true}
-        html.merge!(options[:refresh_button_html] || {})
+      return value
+    end
 
-        text = options[:refresh_button_text] || I18n.t('simple_captcha.refresh_button_text', default: 'Refresh')
-
-        link_to(text, "#{ENV['RAILS_RELATIVE_URL_ROOT']}/simple_captcha?id=#{simple_captcha_image_id(options)}", html)
+    def simple_captcha_key(key_name = nil, request = request)
+      local_session = request.try(:session) || session
+      if key_name.nil?
+        local_session[:captcha] ||= SimpleCaptcha::Utils.generate_key(local_session[:id].to_s, 'captcha')
+      else
+        SimpleCaptcha::Utils.generate_key(local_session[:id].to_s, key_name)
       end
-
-      def simple_captcha_image_id(options={})
-        "simple_captcha-#{options[:field_value][0..10]}"
-      end
-
-      def set_simple_captcha_data(key, options={})
-        code_type = options[:code_type]
-
-        value = generate_simple_captcha_data(code_type)
-        data = SimpleCaptcha::SimpleCaptchaData.get_data(key)
-        data.value = value
-        data.save
-        key
-      end
-
-      def generate_simple_captcha_data(code)
-        value = ''
-
-        case code
-          when 'numeric' then
-            SimpleCaptcha.length.times{value << (48 + rand(10)).chr}
-          else
-            SimpleCaptcha.length.times{value << (65 + rand(26)).chr}
-        end
-
-        return value
-      end
-
-      def simple_captcha_key(key_name = nil, request = request)
-        local_session = request.try(:session) || session
-        if key_name.nil?
-          local_session[:captcha] ||= SimpleCaptcha::Utils.generate_key(local_session[:id].to_s, 'captcha')
-        else
-          SimpleCaptcha::Utils.generate_key(local_session[:id].to_s, key_name)
-        end
-      end
+    end
   end
 end
