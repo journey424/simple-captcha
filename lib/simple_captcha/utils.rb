@@ -37,7 +37,7 @@ module SimpleCaptcha #:nodoc
     # 校验 captcha, 成功: true; 否则: false
     def self.verify!(captcha_key, captcha)
       value = SimpleCaptcha::Utils::simple_captcha_value(captcha_key)
-      if (captcha.delete(" ") == value)
+      if (captcha.delete(" ").casecmp(value) == 0)
         SimpleCaptcha::Utils::simple_captcha_passed!(captcha_key)
         true
       else
